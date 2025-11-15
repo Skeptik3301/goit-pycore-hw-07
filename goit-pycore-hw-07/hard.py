@@ -1,8 +1,6 @@
 from collections import UserDict
 from datetime import datetime, timedelta
 
-
-# ----------------- Класи полів -----------------
 class Field:
     """Базовий клас для всіх полів"""
     def __init__(self, value):
@@ -103,14 +101,23 @@ class AddressBook(UserDict):
 
         for record in self.data.values():
             if record.birthday:
+                # День народження цього року
                 bday_this_year = record.birthday.value.replace(year=today.year)
 
-                # Якщо день народження вже минув — переносимо на наступний рік
+                # Якщо день народження вже минув — беремо наступний рік
                 if bday_this_year < today:
                     bday_this_year = bday_this_year.replace(year=today.year + 1)
 
-                if today <= bday_this_year <= next_week:
-                    day_str = bday_this_year.strftime("%A")  # день тижня
+                # Переносимо на понеділок, якщо день народження на суботу або неділю
+                bday_to_congratulate = bday_this_year
+                if bday_this_year.weekday() == 5:  # субота
+                    bday_to_congratulate += timedelta(days=2)
+                elif bday_this_year.weekday() == 6:  # неділя
+                    bday_to_congratulate += timedelta(days=1)
+
+                # Перевіряємо, чи дата потрапляє в наступні 7 днів
+                if today <= bday_to_congratulate <= next_week:
+                    day_str = bday_to_congratulate.strftime("%A")
                     result.setdefault(day_str, []).append(record.name.value)
 
         return result
@@ -128,6 +135,9 @@ def input_error(func):
             return "Contact not found."
         except IndexError:
             return "Enter all required arguments."
+        except AttributeError:
+            # Якщо спробували звернутися до атрибутів None
+            return "Contact not found."
     return inner
 
 
@@ -149,18 +159,14 @@ def add_contact(args, book: AddressBook):
 def change_contact(args, book: AddressBook):
     name, old_phone, new_phone = args
     record = book.find(name)
-    if record and record.edit_phone(old_phone, new_phone):
+    if record.edit_phone(old_phone, new_phone):
         return "Phone number updated."
-    return "Contact or phone not found."
 
 
 @input_error
 def show_phone(args, book: AddressBook):
-    name = args[0]
-    record = book.find(name)
-    if record:
-        return "; ".join(p.value for p in record.phones)
-    raise KeyError
+    record = book.find(args[0])
+    return "; ".join(p.value for p in record.phones)
 
 
 @input_error
@@ -174,19 +180,14 @@ def show_all(book: AddressBook):
 def add_birthday(args, book: AddressBook):
     name, date_str = args
     record = book.find(name)
-    if not record:
-        return "Contact not found."
     record.add_birthday(date_str)
     return f"Birthday added for {name}."
 
 
 @input_error
 def show_birthday(args, book: AddressBook):
-    name = args[0]
-    record = book.find(name)
-    if record and record.birthday:
-        return f"{name}'s birthday: {record.birthday}"
-    return "Birthday not set."
+    record = book.find(args[0])
+    return f"{record.name.value}'s birthday: {record.birthday}"
 
 
 @input_error
